@@ -1,1 +1,19 @@
+aws_region  = "eu-north-1"
+project_name = "aws-ha-dr"
+environment  = "lab"
 
+db_name            = "appdb"
+db_username        = "appadmin"
+db_instance_class  = "db.t4g.micro"
+db_engine_version  = "8.0"
+
+db_allocated_storage     = 20
+db_max_allocated_storage = 100
+
+backup_retention_period = 7
+
+backup_window     = "01:00-01:30"
+maintenance_window = "sun:02:00-sun:02:30"
+
+deletion_protection = false
+skip_final_snapshot = true
