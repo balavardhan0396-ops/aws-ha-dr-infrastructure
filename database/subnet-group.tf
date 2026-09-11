@@ -7,15 +7,13 @@ data "terraform_remote_state" "network" {
 
   config = {
     bucket = "aws-ha-dr-terraform-state"
-    key    = "01-network/terraform.tfstate"
+    key    = "network/terraform.tfstate"
     region = var.aws_region
   }
 }
 
-
 # ---------------------------------------------------------
 # RDS DB Subnet Group
-# Uses private DB subnets created by 01-network
 # ---------------------------------------------------------
 
 resource "aws_db_subnet_group" "main" {
