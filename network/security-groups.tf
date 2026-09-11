@@ -1,9 +1,5 @@
-# ---------------------------------------------------------
-# Application Load Balancer Security Group
-# ---------------------------------------------------------
-
 resource "aws_security_group" "alb" {
-  name        = "${var.project_name}-alb-sg"
+  name        = "${var.project_name}-${var.environment}-alb-sg"
   description = "Security group for Application Load Balancer"
   vpc_id      = aws_vpc.main.id
 
@@ -32,22 +28,17 @@ resource "aws_security_group" "alb" {
   }
 
   tags = {
-    Name = "${var.project_name}-alb-sg"
+    Name = "${var.project_name}-${var.environment}-alb-sg"
   }
 }
 
-
-# ---------------------------------------------------------
-# Application EC2 Security Group
-# ---------------------------------------------------------
-
 resource "aws_security_group" "app" {
-  name        = "${var.project_name}-app-sg"
+  name        = "${var.project_name}-${var.environment}-app-sg"
   description = "Security group for application EC2 instances"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Application traffic from ALB"
+    description     = "Frontend traffic from ALB"
     from_port       = var.app_port
     to_port         = var.app_port
     protocol        = "tcp"
@@ -63,22 +54,17 @@ resource "aws_security_group" "app" {
   }
 
   tags = {
-    Name = "${var.project_name}-app-sg"
+    Name = "${var.project_name}-${var.environment}-app-sg"
   }
 }
 
-
-# ---------------------------------------------------------
-# RDS Database Security Group
-# ---------------------------------------------------------
-
 resource "aws_security_group" "db" {
-  name        = "${var.project_name}-db-sg"
-  description = "Security group for RDS MySQL database"
+  name        = "${var.project_name}-${var.environment}-db-sg"
+  description = "Security group for RDS"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "MySQL from application servers"
+    description     = "MySQL from application"
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
@@ -94,6 +80,6 @@ resource "aws_security_group" "db" {
   }
 
   tags = {
-    Name = "${var.project_name}-db-sg"
+    Name = "${var.project_name}-${var.environment}-db-sg"
   }
 }
