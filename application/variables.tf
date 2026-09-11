@@ -17,7 +17,7 @@ variable "environment" {
 }
 
 variable "app_port" {
-  description = "Port on which the Node.js application listens."
+  description = "Port on which the application listens."
   type        = number
   default     = 3001
 }
@@ -58,7 +58,12 @@ variable "health_check_path" {
 }
 
 variable "app_image" {
-  description = "Docker image used by the application."
+  description = "Full ECR image URI including tag."
   type        = string
-  default     = "three-tire-app:latest"
+}
+
+variable "enable_asg" {
+  description = "Whether the application Auto Scaling Group should be created."
+  type        = bool
+  default     = false
 }
