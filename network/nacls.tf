@@ -1,47 +1,75 @@
-# ---------------------------------------------------------
-# Public Network ACL
-# ---------------------------------------------------------
+# =========================================================
+# PUBLIC NACL
+# =========================================================
 
 resource "aws_network_acl" "public" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-public-nacl"
+    Name = "${var.project_name}-${var.environment}-public-nacl"
   }
 }
 
-
-# ---------------------------------------------------------
-# Public NACL - Inbound
-# ---------------------------------------------------------
-
-resource "aws_network_acl_rule" "public_ingress" {
+# Allow HTTP inbound
+resource "aws_network_acl_rule" "public_http_ingress" {
   network_acl_id = aws_network_acl.public.id
-  rule_number    = 100
-  egress         = false
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100
+  egress      = false
+
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = "0.0.0.0/0"
+
+  from_port = 80
+  to_port   = 80
 }
 
+# Allow HTTPS inbound
+resource "aws_network_acl_rule" "public_https_ingress" {
+  network_acl_id = aws_network_acl.public.id
 
-# ---------------------------------------------------------
-# Public NACL - Outbound
-# ---------------------------------------------------------
+  rule_number = 110
+  egress      = false
 
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = "0.0.0.0/0"
+
+  from_port = 443
+  to_port   = 443
+}
+
+# Allow ephemeral return traffic
+resource "aws_network_acl_rule" "public_ephemeral_ingress" {
+  network_acl_id = aws_network_acl.public.id
+
+  rule_number = 120
+  egress      = false
+
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = "0.0.0.0/0"
+
+  from_port = 1024
+  to_port   = 65535
+}
+
+# Allow outbound traffic
 resource "aws_network_acl_rule" "public_egress" {
   network_acl_id = aws_network_acl.public.id
-  rule_number    = 100
-  egress         = true
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100
+  egress      = true
+
+  protocol    = "-1"
+  rule_action = "allow"
+
+  cidr_block = "0.0.0.0/0"
 }
-
-
-# ---------------------------------------------------------
-# Public NACL - Subnet Associations
-# ---------------------------------------------------------
 
 resource "aws_network_acl_association" "public" {
   count = length(var.availability_zones)
@@ -52,49 +80,61 @@ resource "aws_network_acl_association" "public" {
 
 
 # =========================================================
-# Application Network ACL
+# APPLICATION NACL
 # =========================================================
 
 resource "aws_network_acl" "app" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-app-nacl"
+    Name = "${var.project_name}-${var.environment}-app-nacl"
   }
 }
 
-
-# ---------------------------------------------------------
-# Application NACL - Inbound
-# ---------------------------------------------------------
-
+# Allow ALB/application traffic inside VPC
 resource "aws_network_acl_rule" "app_ingress" {
   network_acl_id = aws_network_acl.app.id
-  rule_number    = 100
-  egress         = false
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100
+  egress      = false
+
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = var.vpc_cidr
+
+  from_port = var.app_port
+  to_port   = var.app_port
 }
 
+# Allow ephemeral return traffic
+resource "aws_network_acl_rule" "app_ephemeral_ingress" {
+  network_acl_id = aws_network_acl.app.id
 
-# ---------------------------------------------------------
-# Application NACL - Outbound
-# ---------------------------------------------------------
+  rule_number = 110
+  egress      = false
 
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = var.vpc_cidr
+
+  from_port = 1024
+  to_port   = 65535
+}
+
+# Application outbound
 resource "aws_network_acl_rule" "app_egress" {
   network_acl_id = aws_network_acl.app.id
-  rule_number    = 100
-  egress         = true
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100
+  egress      = true
+
+  protocol    = "-1"
+  rule_action = "allow"
+
+  cidr_block = "0.0.0.0/0"
 }
-
-
-# ---------------------------------------------------------
-# Application NACL - Subnet Associations
-# ---------------------------------------------------------
 
 resource "aws_network_acl_association" "app" {
   count = length(var.availability_zones)
@@ -105,49 +145,47 @@ resource "aws_network_acl_association" "app" {
 
 
 # =========================================================
-# Database Network ACL
+# DATABASE NACL
 # =========================================================
 
 resource "aws_network_acl" "db" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "${var.project_name}-db-nacl"
+    Name = "${var.project_name}-${var.environment}-db-nacl"
   }
 }
 
+# Allow MySQL only from application subnets
+resource "aws_network_acl_rule" "db_mysql_ingress" {
+  count = length(var.app_subnet_cidrs)
 
-# ---------------------------------------------------------
-# Database NACL - Inbound
-# ---------------------------------------------------------
-
-resource "aws_network_acl_rule" "db_ingress" {
   network_acl_id = aws_network_acl.db.id
-  rule_number    = 100
-  egress         = false
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100 + count.index
+  egress      = false
+
+  protocol    = "tcp"
+  rule_action = "allow"
+
+  cidr_block = var.app_subnet_cidrs[count.index]
+
+  from_port = 3306
+  to_port   = 3306
 }
 
-
-# ---------------------------------------------------------
-# Database NACL - Outbound
-# ---------------------------------------------------------
-
+# Allow DB return traffic inside the VPC
 resource "aws_network_acl_rule" "db_egress" {
   network_acl_id = aws_network_acl.db.id
-  rule_number    = 100
-  egress         = true
-  protocol       = "-1"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
+
+  rule_number = 100
+  egress      = true
+
+  protocol    = "-1"
+  rule_action = "allow"
+
+  cidr_block = var.vpc_cidr
 }
-
-
-# ---------------------------------------------------------
-# Database NACL - Subnet Associations
-# ---------------------------------------------------------
 
 resource "aws_network_acl_association" "db" {
   count = length(var.availability_zones)
