@@ -1,5 +1,5 @@
 # ---------------------------------------------------------
-# Remote state: Database
+# Remote State: Database
 # ---------------------------------------------------------
 
 data "terraform_remote_state" "database" {
@@ -7,14 +7,13 @@ data "terraform_remote_state" "database" {
 
   config = {
     bucket = "aws-ha-dr-terraform-state"
-    key    = "02-database/terraform.tfstate"
+    key    = "database/terraform.tfstate"
     region = var.aws_region
   }
 }
 
-
 # ---------------------------------------------------------
-# Remote state: Application
+# Remote State: Application
 # ---------------------------------------------------------
 
 data "terraform_remote_state" "application" {
@@ -22,11 +21,10 @@ data "terraform_remote_state" "application" {
 
   config = {
     bucket = "aws-ha-dr-terraform-state"
-    key    = "03-application/terraform.tfstate"
+    key    = "application/terraform.tfstate"
     region = var.aws_region
   }
 }
-
 
 # =========================================================
 # APPLICATION / EC2 MONITORING
@@ -44,13 +42,13 @@ resource "aws_cloudwatch_metric_alarm" "app_high_cpu" {
     AutoScalingGroupName = data.terraform_remote_state.application.outputs.autoscaling_group_name
   }
 
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 70
-  comparison_operator = "GreaterThanThreshold"
+  statistic          = "Average"
+  period             = 300
+  evaluation_periods = 2
+  threshold          = 70
 
-  treat_missing_data = "notBreaching"
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
@@ -61,9 +59,41 @@ resource "aws_cloudwatch_metric_alarm" "app_high_cpu" {
   }
 }
 
+# =========================================================
+# ASG CAPACITY
+# =========================================================
+
+resource "aws_cloudwatch_metric_alarm" "asg_low_capacity" {
+  alarm_name = "${var.project_name}-${var.environment}-asg-low-capacity"
+
+  alarm_description = "Application Auto Scaling Group has fewer instances than expected"
+
+  namespace   = "AWS/AutoScaling"
+  metric_name = "GroupInServiceInstances"
+
+  dimensions = {
+    AutoScalingGroupName = data.terraform_remote_state.application.outputs.autoscaling_group_name
+  }
+
+  statistic          = "Minimum"
+  period             = 300
+  evaluation_periods = 2
+  threshold          = 2
+
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+
+  alarm_actions = [
+    aws_sns_topic.alerts.arn
+  ]
+
+  tags = {
+    Name = "${var.project_name}-asg-low-capacity"
+  }
+}
 
 # =========================================================
-# APPLICATION LOAD BALANCER MONITORING
+# APPLICATION LOAD BALANCER
 # =========================================================
 
 resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
@@ -78,13 +108,13 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
     LoadBalancer = data.terraform_remote_state.application.outputs.alb_arn_suffix
   }
 
-  statistic           = "Sum"
-  period              = 300
-  evaluation_periods  = 1
-  threshold           = 5
-  comparison_operator = "GreaterThanThreshold"
+  statistic          = "Sum"
+  period             = 300
+  evaluation_periods = 1
+  threshold          = 5
 
-  treat_missing_data = "notBreaching"
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
@@ -94,7 +124,6 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
     Name = "${var.project_name}-alb-5xx"
   }
 }
-
 
 resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
   alarm_name = "${var.project_name}-${var.environment}-alb-unhealthy-hosts"
@@ -109,13 +138,13 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
     TargetGroup  = data.terraform_remote_state.application.outputs.target_group_arn_suffix
   }
 
-  statistic           = "Maximum"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 1
-  comparison_operator = "GreaterThanOrEqualToThreshold"
+  statistic          = "Maximum"
+  period             = 300
+  evaluation_periods = 2
+  threshold          = 1
 
-  treat_missing_data = "notBreaching"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
@@ -126,6 +155,47 @@ resource "aws_cloudwatch_metric_alarm" "alb_unhealthy_hosts" {
   }
 }
 
+# =========================================================
+# APPLICATION ERROR LOGS
+# =========================================================
+
+resource "aws_cloudwatch_log_metric_filter" "application_errors" {
+  name           = "${var.project_name}-${var.environment}-application-errors"
+  log_group_name = data.terraform_remote_state.application.outputs.application_log_group_name
+
+  pattern = "\"ERROR\""
+
+  metric_transformation {
+    name      = "ApplicationErrorCount"
+    namespace = "${var.project_name}/${var.environment}/Application"
+    value     = "1"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "application_errors" {
+  alarm_name = "${var.project_name}-${var.environment}-application-errors"
+
+  alarm_description = "Application logs contain ERROR messages"
+
+  namespace   = "${var.project_name}/${var.environment}/Application"
+  metric_name = "ApplicationErrorCount"
+
+  statistic          = "Sum"
+  period             = 300
+  evaluation_periods = 1
+  threshold          = 5
+
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching"
+
+  alarm_actions = [
+    aws_sns_topic.alerts.arn
+  ]
+
+  tags = {
+    Name = "${var.project_name}-application-errors"
+  }
+}
 
 # =========================================================
 # RDS MONITORING
@@ -143,13 +213,13 @@ resource "aws_cloudwatch_metric_alarm" "rds_high_cpu" {
     DBInstanceIdentifier = data.terraform_remote_state.database.outputs.rds_instance_id
   }
 
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 70
-  comparison_operator = "GreaterThanThreshold"
+  statistic          = "Average"
+  period             = 300
+  evaluation_periods = 2
+  threshold          = 70
 
-  treat_missing_data = "notBreaching"
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
@@ -159,7 +229,6 @@ resource "aws_cloudwatch_metric_alarm" "rds_high_cpu" {
     Name = "${var.project_name}-rds-high-cpu"
   }
 }
-
 
 resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
   alarm_name = "${var.project_name}-${var.environment}-rds-low-storage"
@@ -173,16 +242,14 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
     DBInstanceIdentifier = data.terraform_remote_state.database.outputs.rds_instance_id
   }
 
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
+  statistic          = "Average"
+  period             = 300
+  evaluation_periods = 2
 
-  # 2 GB in bytes
   threshold = 2147483648
 
   comparison_operator = "LessThanThreshold"
-
-  treat_missing_data = "notBreaching"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
@@ -192,7 +259,6 @@ resource "aws_cloudwatch_metric_alarm" "rds_low_storage" {
     Name = "${var.project_name}-rds-low-storage"
   }
 }
-
 
 resource "aws_cloudwatch_metric_alarm" "rds_high_connections" {
   alarm_name = "${var.project_name}-${var.environment}-rds-high-connections"
@@ -206,13 +272,13 @@ resource "aws_cloudwatch_metric_alarm" "rds_high_connections" {
     DBInstanceIdentifier = data.terraform_remote_state.database.outputs.rds_instance_id
   }
 
-  statistic           = "Average"
-  period              = 300
-  evaluation_periods  = 2
-  threshold           = 80
-  comparison_operator = "GreaterThanThreshold"
+  statistic          = "Average"
+  period             = 300
+  evaluation_periods = 2
+  threshold          = 80
 
-  treat_missing_data = "notBreaching"
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
 
   alarm_actions = [
     aws_sns_topic.alerts.arn
