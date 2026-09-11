@@ -1,29 +1,29 @@
 variable "aws_region" {
-  description = "AWS region where the infrastructure will be deployed."
+  description = "AWS region"
   type        = string
   default     = "eu-north-1"
 }
 
 variable "project_name" {
-  description = "Name of the project."
+  description = "Project name"
   type        = string
   default     = "aws-ha-dr"
 }
 
 variable "environment" {
-  description = "Environment name."
+  description = "Environment name"
   type        = string
   default     = "lab"
 }
 
 variable "vpc_cidr" {
-  description = "CIDR block for the VPC."
+  description = "VPC CIDR"
   type        = string
   default     = "10.0.0.0/16"
 }
 
 variable "availability_zones" {
-  description = "Availability Zones used by the infrastructure."
+  description = "Availability zones"
   type        = list(string)
 
   default = [
@@ -33,7 +33,7 @@ variable "availability_zones" {
 }
 
 variable "public_subnet_cidrs" {
-  description = "CIDR blocks for public subnets."
+  description = "Public subnet CIDRs"
   type        = list(string)
 
   default = [
@@ -43,7 +43,7 @@ variable "public_subnet_cidrs" {
 }
 
 variable "app_subnet_cidrs" {
-  description = "CIDR blocks for private application subnets."
+  description = "Private application subnet CIDRs"
   type        = list(string)
 
   default = [
@@ -53,7 +53,7 @@ variable "app_subnet_cidrs" {
 }
 
 variable "db_subnet_cidrs" {
-  description = "CIDR blocks for private database subnets."
+  description = "Private database subnet CIDRs"
   type        = list(string)
 
   default = [
@@ -63,7 +63,7 @@ variable "db_subnet_cidrs" {
 }
 
 variable "app_port" {
-  description = "Port used by the application."
+  description = "Frontend/Nginx port exposed to the Application Load Balancer"
   type        = number
-  default     = 3001
+  default     = 80
 }
