@@ -7,11 +7,10 @@ data "terraform_remote_state" "network" {
 
   config = {
     bucket = "aws-ha-dr-terraform-state"
-    key    = "01-network/terraform.tfstate"
+    key    = "network/terraform.tfstate"
     region = var.aws_region
   }
 }
-
 
 # =========================================================
 # Remote State - Database
@@ -22,11 +21,10 @@ data "terraform_remote_state" "database" {
 
   config = {
     bucket = "aws-ha-dr-terraform-state"
-    key    = "02-database/terraform.tfstate"
+    key    = "database/terraform.tfstate"
     region = var.aws_region
   }
 }
-
 
 # =========================================================
 # EC2 IAM Role
@@ -56,9 +54,8 @@ resource "aws_iam_role" "app" {
   }
 }
 
-
 # =========================================================
-# Secrets Manager Access Policy
+# Secrets Manager Access
 # =========================================================
 
 resource "aws_iam_role_policy" "secrets" {
@@ -82,16 +79,67 @@ resource "aws_iam_role_policy" "secrets" {
   })
 }
 
-
 # =========================================================
-# CloudWatch Agent Policy
+# ECR Pull Access
 # =========================================================
 
-resource "aws_iam_role_policy_attachment" "cloudwatch" {
-  role       = aws_iam_role.app.name
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+resource "aws_iam_role_policy" "ecr" {
+  name = "${var.project_name}-app-ecr-policy"
+  role = aws_iam_role.app.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+
+        Action = [
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:BatchGetImage"
+        ]
+
+        Resource = aws_ecr_repository.app.arn
+      }
+    ]
+  })
 }
 
+# =========================================================
+# CloudWatch Logs Access
+# =========================================================
+
+resource "aws_iam_role_policy" "logs" {
+  name = "${var.project_name}-app-logs-policy"
+  role = aws_iam_role.app.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+
+        Resource = "${aws_cloudwatch_log_group.application.arn}:*"
+      }
+    ]
+  })
+}
 
 # =========================================================
 # EC2 Instance Profile
