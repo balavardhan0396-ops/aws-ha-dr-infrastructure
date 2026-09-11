@@ -12,8 +12,3 @@ output "kms_alias" {
   description = "Alias of the security KMS key"
   value       = aws_kms_alias.main.name
 }
-
-output "security_audit_role_arn" {
-  description = "ARN of the security audit IAM role"
-  value       = aws_iam_role.security_audit.arn
-}
