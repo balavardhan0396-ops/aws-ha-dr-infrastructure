@@ -1,5 +1,4 @@
-
-aws_region  = "eu-north-1"
+aws_region   = "eu-north-1"
 project_name = "aws-ha-dr"
 environment  = "lab"
 
@@ -25,4 +24,4 @@ db_subnet_cidrs = [
   "10.0.22.0/24"
 ]
 
-app_port = 3001
+app_port = 80
