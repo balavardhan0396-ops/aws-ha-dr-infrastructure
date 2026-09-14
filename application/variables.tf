@@ -17,7 +17,7 @@ variable "environment" {
 }
 
 variable "app_port" {
-  description = "Port on which the application listens."
+  description = "Port on which the Node.js application listens."
   type        = number
   default     = 3001
 }
