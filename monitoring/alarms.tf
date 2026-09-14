@@ -15,6 +15,7 @@ data "terraform_remote_state" "application" {
     bucket = "aws-ha-dr-terraform-state"
     key    = "application/terraform.tfstate"
     region = var.aws_region
+  }
 }
 
 resource "aws_cloudwatch_metric_alarm" "app_high_cpu" {
