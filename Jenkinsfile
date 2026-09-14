@@ -98,7 +98,7 @@ pipeline {
 
         stage('Validate Inputs and Tools') {
             steps {
-                sh '''
+                bat '''
                     terraform version
                     aws --version
                     git --version
@@ -109,10 +109,10 @@ pipeline {
         stage('Terraform Format and Validate') {
             steps {
 
-                sh 'terraform fmt -check -recursive'
+                bat 'terraform fmt -check -recursive'
 
                 dir('network') {
-                    sh '''
+                    bat '''
                         terraform init -backend=false -input=false
                         terraform validate
                     '''
@@ -129,7 +129,7 @@ pipeline {
                         credentialsId: env.AWS_CREDENTIALS_ID
                     ]
                 ]) {
-                    sh 'aws sts get-caller-identity'
+                    bat 'aws sts get-caller-identity'
                 }
             }
         }
@@ -174,7 +174,7 @@ pipeline {
                                 credentialsId: env.AWS_CREDENTIALS_ID
                             ]
                         ]) {
-                            env.RESOLVED_AMI_ID = sh(
+                            env.RESOLVED_AMI_ID = bat(
                                 script: "aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query 'Parameter.Value' --output text",
                                 returnStdout: true
                             ).trim()
@@ -208,7 +208,7 @@ pipeline {
                             credentialsId: env.AWS_CREDENTIALS_ID
                         ]
                     ]) {
-                        sh '''
+                        bat '''
                             set -eu
 
                             test -f Dockerfile
@@ -278,7 +278,7 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout "$ECR_REGISTRY" || true'
+            bat 'docker logout "$ECR_REGISTRY" || true'
             deleteDir()
         }
     }
@@ -295,7 +295,7 @@ def tfDeploy(String module, String extraVars) {
             ]
         ]) {
 
-            sh """
+            bat """
                 terraform init -input=false
 
                 terraform plan \
@@ -305,7 +305,7 @@ def tfDeploy(String module, String extraVars) {
             """
 
             if (params.DEPLOY_INFRASTRUCTURE) {
-                sh 'terraform apply -input=false -auto-approve tfplan'
+                bat 'terraform apply -input=false -auto-approve tfplan'
             }
         }
     }
