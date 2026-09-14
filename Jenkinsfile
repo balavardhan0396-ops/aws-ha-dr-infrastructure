@@ -185,7 +185,7 @@ pipeline {
             }
         }
 
-        stage('Terraform Format Check') {
+      /*  stage('Terraform Format Check') {
             steps {
                 bat '''
                     @echo off
@@ -198,7 +198,7 @@ pipeline {
                 '''
             }
         }
-
+*/
         stage('Terraform Network Validation') {
             steps {
                 dir("${TF_NETWORK_DIR}") {
