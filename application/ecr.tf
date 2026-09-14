@@ -1,7 +1,3 @@
-# ---------------------------------------------------------
-# Amazon ECR Repository
-# ---------------------------------------------------------
-
 resource "aws_ecr_repository" "app" {
   name                 = "${var.project_name}-${var.environment}-app"
   image_tag_mutability = "MUTABLE"
@@ -15,10 +11,6 @@ resource "aws_ecr_repository" "app" {
   }
 }
 
-# ---------------------------------------------------------
-# ECR Lifecycle Policy
-# ---------------------------------------------------------
-
 resource "aws_ecr_lifecycle_policy" "app" {
   repository = aws_ecr_repository.app.name
 
@@ -26,8 +18,7 @@ resource "aws_ecr_lifecycle_policy" "app" {
     rules = [
       {
         rulePriority = 1
-
-        description = "Keep the latest 10 images"
+        description  = "Keep latest 10 images"
 
         selection = {
           tagStatus   = "any"
