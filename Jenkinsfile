@@ -1,6 +1,6 @@
 pipeline {
 
-    agent { label 'terraform-docker' }
+    agent any
 
     options {
         timestamps()
