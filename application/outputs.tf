@@ -1,7 +1,3 @@
-# ---------------------------------------------------------
-# ALB Outputs
-# ---------------------------------------------------------
-
 output "alb_id" {
   description = "Application Load Balancer ID."
   value       = aws_lb.app.id
@@ -13,7 +9,7 @@ output "alb_arn" {
 }
 
 output "alb_arn_suffix" {
-  description = "ALB ARN suffix used by CloudWatch."
+  description = "Application Load Balancer ARN suffix for CloudWatch."
   value       = aws_lb.app.arn_suffix
 }
 
@@ -23,13 +19,9 @@ output "alb_dns_name" {
 }
 
 output "alb_zone_id" {
-  description = "ALB hosted zone ID used by Route 53."
+  description = "Application Load Balancer hosted zone ID."
   value       = aws_lb.app.zone_id
 }
-
-# ---------------------------------------------------------
-# Target Group Outputs
-# ---------------------------------------------------------
 
 output "target_group_arn" {
   description = "Application target group ARN."
@@ -37,7 +29,7 @@ output "target_group_arn" {
 }
 
 output "target_group_arn_suffix" {
-  description = "Target group ARN suffix used by CloudWatch."
+  description = "Application target group ARN suffix for CloudWatch."
   value       = aws_lb_target_group.app.arn_suffix
 }
 
@@ -45,10 +37,6 @@ output "target_group_name" {
   description = "Application target group name."
   value       = aws_lb_target_group.app.name
 }
-
-# ---------------------------------------------------------
-# Auto Scaling Outputs
-# ---------------------------------------------------------
 
 output "autoscaling_group_name" {
   description = "Application Auto Scaling Group name."
@@ -70,18 +58,10 @@ output "autoscaling_max_size" {
   value       = var.max_size
 }
 
-# ---------------------------------------------------------
-# Launch Template Outputs
-# ---------------------------------------------------------
-
 output "launch_template_id" {
   description = "Application EC2 launch template ID."
   value       = aws_launch_template.app.id
 }
-
-# ---------------------------------------------------------
-# IAM Outputs
-# ---------------------------------------------------------
 
 output "app_iam_role_arn" {
   description = "IAM role ARN used by application EC2 instances."
@@ -93,25 +73,17 @@ output "app_instance_profile_name" {
   value       = aws_iam_instance_profile.app.name
 }
 
-# ---------------------------------------------------------
-# ECR Outputs
-# ---------------------------------------------------------
-
 output "ecr_repository_url" {
-  description = "Amazon ECR repository URL."
+  description = "ECR repository URL."
   value       = aws_ecr_repository.app.repository_url
 }
 
 output "ecr_repository_arn" {
-  description = "Amazon ECR repository ARN."
+  description = "ECR repository ARN."
   value       = aws_ecr_repository.app.arn
 }
 
-# ---------------------------------------------------------
-# Logging Outputs
-# ---------------------------------------------------------
-
 output "application_log_group_name" {
-  description = "CloudWatch log group used by application containers."
+  description = "CloudWatch log group for application container logs."
   value       = aws_cloudwatch_log_group.application.name
 }
