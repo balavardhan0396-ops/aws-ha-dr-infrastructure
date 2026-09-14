@@ -18,22 +18,26 @@ pipeline {
 
         string(
             name: 'AWS_REGION',
-            defaultValue: 'eu-north-1'
+            defaultValue: 'eu-north-1',
+            description: 'AWS region'
         )
 
         string(
             name: 'AWS_ACCOUNT_ID',
-            defaultValue: '297681905216'
+            defaultValue: '297681905216',
+            description: 'AWS account ID'
         )
 
         string(
             name: 'PROJECT_NAME',
-            defaultValue: 'aws-ha-dr-lab'
+            defaultValue: 'aws-ha-dr-lab',
+            description: 'Project name'
         )
 
         string(
             name: 'ENVIRONMENT',
-            defaultValue: 'dev'
+            defaultValue: 'dev',
+            description: 'Environment name'
         )
 
         string(
@@ -62,18 +66,33 @@ pipeline {
 
         string(
             name: 'APP_REPOSITORY_BRANCH',
-            defaultValue: 'main'
+            defaultValue: 'main',
+            description: 'Application repository branch'
         )
 
         string(
             name: 'APP_DOCKER_CONTEXT',
-            defaultValue: '.'
+            defaultValue: '.',
+            description: 'Docker build context'
         )
     }
 
     environment {
 
+        /*
+         * Windows executable paths.
+         *
+         * Preferred Terraform location:
+         * C:\Terraform\terraform.exe
+         *
+         * AWS CLI location shown below is your current installation.
+         */
+        TERRAFORM_EXE = 'C:\\Terraform\\terraform.exe'
+
+        AWS_EXE = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe'
+
         AWS_REGION = "${params.AWS_REGION}"
+
         AWS_DEFAULT_REGION = "${params.AWS_REGION}"
 
         ECR_REGISTRY = "${params.AWS_ACCOUNT_ID}.dkr.ecr.${params.AWS_REGION}.amazonaws.com"
@@ -85,13 +104,22 @@ pipeline {
         AWS_CREDENTIALS_ID = 'aws-ha-dr-aws-credentials'
 
         TF_IN_AUTOMATION = 'true'
+
         TF_INPUT = 'false'
+
+        /*
+         * Network-only deployment directory.
+         * Change this if your folder is named differently.
+         */
+        TF_NETWORK_DIR = 'network'
     }
 
     stages {
 
         stage('Checkout Infrastructure') {
             steps {
+                echo 'Checking out infrastructure repository...'
+
                 checkout scm
             }
         }
@@ -99,22 +127,108 @@ pipeline {
         stage('Validate Inputs and Tools') {
             steps {
                 bat '''
-                    terraform version
-                    aws --version
+                    @echo off
+
+                    echo ==========================================
+                    echo Checking Terraform executable
+                    echo ==========================================
+
+                    if not exist "%TERRAFORM_EXE%" (
+                        echo ERROR: Terraform was not found:
+                        echo %TERRAFORM_EXE%
+                        exit /b 1
+                    )
+
+                    "%TERRAFORM_EXE%" version
+
+                    echo.
+                    echo ==========================================
+                    echo Checking AWS CLI executable
+                    echo ==========================================
+
+                    if not exist "%AWS_EXE%" (
+                        echo ERROR: AWS CLI was not found:
+                        echo %AWS_EXE%
+                        exit /b 1
+                    )
+
+                    "%AWS_EXE%" --version
+
+                    echo.
+                    echo ==========================================
+                    echo Checking Git
+                    echo ==========================================
+
                     git --version
                 '''
             }
         }
 
-        stage('Terraform Format and Validate') {
+        stage('Validate Required Directories') {
             steps {
+                bat '''
+                    @echo off
 
-                bat 'terraform fmt -check -recursive'
+                    echo ==========================================
+                    echo Checking Terraform directory
+                    echo ==========================================
 
-                dir('network') {
+                    if not exist "%TF_NETWORK_DIR%" (
+                        echo ERROR: Terraform directory was not found:
+                        echo %TF_NETWORK_DIR%
+                        exit /b 1
+                    )
+
+                    echo Terraform directory found:
+                    echo %TF_NETWORK_DIR%
+                '''
+            }
+        }
+
+        stage('Terraform Format Check') {
+            steps {
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo Terraform Format Check
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" fmt -check -recursive
+                '''
+            }
+        }
+
+        stage('Terraform Network Validation') {
+            steps {
+                dir("${TF_NETWORK_DIR}") {
                     bat '''
-                        terraform init -backend=false -input=false
-                        terraform validate
+                        @echo off
+
+                        echo ==========================================
+                        echo Terraform Network Initialization
+                        echo ==========================================
+
+                        "%TERRAFORM_EXE%" init ^
+                            -backend=false ^
+                            -input=false
+
+                        if errorlevel 1 (
+                            echo ERROR: Terraform init failed.
+                            exit /b 1
+                        )
+
+                        echo.
+                        echo ==========================================
+                        echo Terraform Network Validation
+                        echo ==========================================
+
+                        "%TERRAFORM_EXE%" validate
+
+                        if errorlevel 1 (
+                            echo ERROR: Terraform validation failed.
+                            exit /b 1
+                        )
                     '''
                 }
             }
@@ -122,34 +236,89 @@ pipeline {
 
         stage('AWS Authentication') {
             steps {
-
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: env.AWS_CREDENTIALS_ID
                     ]
                 ]) {
-                    bat 'aws sts get-caller-identity'
+                    bat '''
+                        @echo off
+
+                        echo ==========================================
+                        echo AWS Caller Identity
+                        echo ==========================================
+
+                        "%AWS_EXE%" sts get-caller-identity ^
+                            --region "%AWS_REGION%"
+
+                        if errorlevel 1 (
+                            echo ERROR: AWS authentication failed.
+                            exit /b 1
+                        )
+                    '''
                 }
             }
         }
 
         stage('Network Terraform Plan') {
             steps {
-                tfDeploy('network', '')
+                tfDeploy("${env.TF_NETWORK_DIR}", '')
+            }
+        }
+
+        stage('Network Terraform Apply') {
+            when {
+                expression {
+                    return params.DEPLOY_INFRASTRUCTURE
+                }
+            }
+
+            steps {
+                dir("${env.TF_NETWORK_DIR}") {
+                    withCredentials([
+                        [
+                            $class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: env.AWS_CREDENTIALS_ID
+                        ]
+                    ]) {
+                        bat '''
+                            @echo off
+
+                            echo ==========================================
+                            echo Terraform Network Apply
+                            echo ==========================================
+
+                            if not exist tfplan (
+                                echo ERROR: tfplan file was not found.
+                                exit /b 1
+                            )
+
+                            "%TERRAFORM_EXE%" apply ^
+                                -input=false ^
+                                -auto-approve ^
+                                tfplan
+
+                            if errorlevel 1 (
+                                echo ERROR: Terraform apply failed.
+                                exit /b 1
+                            )
+                        '''
+                    }
+                }
             }
         }
 
         /*
         ============================================================
         TEMPORARILY DISABLED STAGES
-        Enable these later after Network is successfully deployed.
+        Enable these after Network deployment is successful.
         ============================================================
 
         stage('Checkout Application') {
             when {
                 expression {
-                    params.APP_REPOSITORY_URL?.trim()
+                    return params.APP_REPOSITORY_URL?.trim()
                 }
             }
 
@@ -175,7 +344,14 @@ pipeline {
                             ]
                         ]) {
                             env.RESOLVED_AMI_ID = bat(
-                                script: "aws ssm get-parameter --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 --query 'Parameter.Value' --output text",
+                                script: '''
+                                    @echo off
+                                    "%AWS_EXE%" ssm get-parameter ^
+                                        --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 ^
+                                        --query Parameter.Value ^
+                                        --output text ^
+                                        --region "%AWS_REGION%"
+                                ''',
                                 returnStdout: true
                             ).trim()
                         }
@@ -209,25 +385,56 @@ pipeline {
                         ]
                     ]) {
                         bat '''
-                            set -eu
+                            @echo off
 
-                            test -f Dockerfile
+                            if not exist Dockerfile (
+                                echo ERROR: Dockerfile was not found.
+                                exit /b 1
+                            )
 
-                            aws ecr describe-repositories \
-                                --repository-names "$ECR_REPOSITORY" \
-                                >/dev/null 2>&1 || \
-                            aws ecr create-repository \
-                                --repository-name "$ECR_REPOSITORY" \
-                                --image-scanning-configuration scanOnPush=true
+                            "%AWS_EXE%" ecr describe-repositories ^
+                                --repository-names "%ECR_REPOSITORY%" ^
+                                --region "%AWS_REGION%"
 
-                            aws ecr get-login-password |
-                                docker login \
-                                --username AWS \
-                                --password-stdin "$ECR_REGISTRY"
+                            if errorlevel 1 (
+                                echo ECR repository was not found. Creating it...
 
-                            docker build -t "$IMAGE_URI" "$APP_DOCKER_CONTEXT"
+                                "%AWS_EXE%" ecr create-repository ^
+                                    --repository-name "%ECR_REPOSITORY%" ^
+                                    --region "%AWS_REGION%"
 
-                            docker push "$IMAGE_URI"
+                                if errorlevel 1 (
+                                    echo ERROR: ECR repository creation failed.
+                                    exit /b 1
+                                )
+                            )
+
+                            "%AWS_EXE%" ecr get-login-password ^
+                                --region "%AWS_REGION%" |
+                                docker login ^
+                                --username AWS ^
+                                --password-stdin "%ECR_REGISTRY%"
+
+                            if errorlevel 1 (
+                                echo ERROR: Docker login failed.
+                                exit /b 1
+                            )
+
+                            docker build ^
+                                -t "%IMAGE_URI%" ^
+                                "%APP_DOCKER_CONTEXT%"
+
+                            if errorlevel 1 (
+                                echo ERROR: Docker build failed.
+                                exit /b 1
+                            )
+
+                            docker push "%IMAGE_URI%"
+
+                            if errorlevel 1 (
+                                echo ERROR: Docker push failed.
+                                exit /b 1
+                            )
                         '''
                     }
                 }
@@ -261,7 +468,7 @@ pipeline {
         stage('DNS and HTTPS') {
             when {
                 expression {
-                    params.DOMAIN_NAME?.trim()
+                    return params.DOMAIN_NAME?.trim()
                 }
             }
 
@@ -277,12 +484,34 @@ pipeline {
     }
 
     post {
+
+        success {
+            echo '=========================================='
+            echo 'Jenkins pipeline completed successfully.'
+            echo '=========================================='
+        }
+
+        failure {
+            echo '=========================================='
+            echo 'Jenkins pipeline failed.'
+            echo 'Please review the console output.'
+            echo '=========================================='
+        }
+
         always {
-            bat 'docker logout "$ECR_REGISTRY" || true'
+            echo 'Cleaning Jenkins workspace...'
+
             deleteDir()
         }
     }
 }
+
+
+/*
+============================================================
+Reusable Terraform deployment function
+============================================================
+*/
 
 def tfDeploy(String module, String extraVars) {
 
@@ -296,16 +525,54 @@ def tfDeploy(String module, String extraVars) {
         ]) {
 
             bat """
-                terraform init -input=false
+                @echo off
 
-                terraform plan \
-                    -input=false \
-                    -out=tfplan \
+                echo ==========================================
+                echo Terraform Init - ${module}
+                echo ==========================================
+
+                "%TERRAFORM_EXE%" init ^
+                    -input=false
+
+                if errorlevel 1 (
+                    echo ERROR: Terraform init failed for ${module}.
+                    exit /b 1
+                )
+
+                echo.
+                echo ==========================================
+                echo Terraform Plan - ${module}
+                echo ==========================================
+
+                "%TERRAFORM_EXE%" plan ^
+                    -input=false ^
+                    -out=tfplan ^
                     ${extraVars}
+
+                if errorlevel 1 (
+                    echo ERROR: Terraform plan failed for ${module}.
+                    exit /b 1
+                )
             """
 
             if (params.DEPLOY_INFRASTRUCTURE) {
-                bat 'terraform apply -input=false -auto-approve tfplan'
+                bat """
+                    @echo off
+
+                    echo ==========================================
+                    echo Terraform Apply - ${module}
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" apply ^
+                        -input=false ^
+                        -auto-approve ^
+                        tfplan
+
+                    if errorlevel 1 (
+                        echo ERROR: Terraform apply failed for ${module}.
+                        exit /b 1
+                    )
+                """
             }
         }
     }
