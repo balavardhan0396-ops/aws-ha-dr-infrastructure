@@ -25,8 +25,7 @@ variable "vpc_cidr" {
 variable "availability_zones" {
   description = "Availability zones"
   type        = list(string)
-
-  default = [
+  default     = [
     "eu-north-1a",
     "eu-north-1b"
   ]
@@ -35,8 +34,7 @@ variable "availability_zones" {
 variable "public_subnet_cidrs" {
   description = "Public subnet CIDRs"
   type        = list(string)
-
-  default = [
+  default     = [
     "10.0.1.0/24",
     "10.0.2.0/24"
   ]
@@ -45,8 +43,7 @@ variable "public_subnet_cidrs" {
 variable "app_subnet_cidrs" {
   description = "Private application subnet CIDRs"
   type        = list(string)
-
-  default = [
+  default     = [
     "10.0.11.0/24",
     "10.0.12.0/24"
   ]
@@ -55,15 +52,14 @@ variable "app_subnet_cidrs" {
 variable "db_subnet_cidrs" {
   description = "Private database subnet CIDRs"
   type        = list(string)
-
-  default = [
+  default     = [
     "10.0.21.0/24",
     "10.0.22.0/24"
   ]
 }
 
 variable "app_port" {
-  description = "Frontend/Nginx port exposed to the Application Load Balancer"
+  description = "Port on which the application listens"
   type        = number
-  default     = 80
+  default     = 3001
 }
