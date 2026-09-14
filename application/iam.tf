@@ -1,7 +1,3 @@
-# =========================================================
-# Remote State - Network
-# =========================================================
-
 data "terraform_remote_state" "network" {
   backend = "s3"
 
@@ -12,10 +8,6 @@ data "terraform_remote_state" "network" {
   }
 }
 
-# =========================================================
-# Remote State - Database
-# =========================================================
-
 data "terraform_remote_state" "database" {
   backend = "s3"
 
@@ -25,10 +17,6 @@ data "terraform_remote_state" "database" {
     region = var.aws_region
   }
 }
-
-# =========================================================
-# EC2 IAM Role
-# =========================================================
 
 resource "aws_iam_role" "app" {
   name = "${var.project_name}-${var.environment}-app-role"
@@ -50,16 +38,12 @@ resource "aws_iam_role" "app" {
   })
 
   tags = {
-    Name = "${var.project_name}-app-role"
+    Name = "${var.project_name}-${var.environment}-app-role"
   }
 }
 
-# =========================================================
-# Secrets Manager Access
-# =========================================================
-
 resource "aws_iam_role_policy" "secrets" {
-  name = "${var.project_name}-app-secrets-policy"
+  name = "${var.project_name}-${var.environment}-app-secrets-policy"
   role = aws_iam_role.app.id
 
   policy = jsonencode({
@@ -79,12 +63,8 @@ resource "aws_iam_role_policy" "secrets" {
   })
 }
 
-# =========================================================
-# ECR Pull Access
-# =========================================================
-
 resource "aws_iam_role_policy" "ecr" {
-  name = "${var.project_name}-app-ecr-policy"
+  name = "${var.project_name}-${var.environment}-app-ecr-policy"
   role = aws_iam_role.app.id
 
   policy = jsonencode({
@@ -115,12 +95,8 @@ resource "aws_iam_role_policy" "ecr" {
   })
 }
 
-# =========================================================
-# CloudWatch Logs Access
-# =========================================================
-
 resource "aws_iam_role_policy" "logs" {
-  name = "${var.project_name}-app-logs-policy"
+  name = "${var.project_name}-${var.environment}-app-logs-policy"
   role = aws_iam_role.app.id
 
   policy = jsonencode({
@@ -141,16 +117,11 @@ resource "aws_iam_role_policy" "logs" {
   })
 }
 
-# =========================================================
-# EC2 Instance Profile
-# =========================================================
-
 resource "aws_iam_instance_profile" "app" {
   name = "${var.project_name}-${var.environment}-app-profile"
-
   role = aws_iam_role.app.name
 
   tags = {
-    Name = "${var.project_name}-app-profile"
+    Name = "${var.project_name}-${var.environment}-app-profile"
   }
 }
