@@ -1,7 +1,3 @@
-# ---------------------------------------------------------
-# Remote state: Application
-# ---------------------------------------------------------
-
 data "terraform_remote_state" "application" {
   backend = "s3"
 
@@ -12,10 +8,6 @@ data "terraform_remote_state" "application" {
   }
 }
 
-# ---------------------------------------------------------
-# Route 53 Hosted Zone
-# ---------------------------------------------------------
-
 resource "aws_route53_zone" "main" {
   name = var.domain_name
 
@@ -24,16 +16,10 @@ resource "aws_route53_zone" "main" {
   }
 }
 
-# ---------------------------------------------------------
-# Application DNS Record
-# ---------------------------------------------------------
-
 resource "aws_route53_record" "application" {
   zone_id = aws_route53_zone.main.zone_id
-
-  name = "${var.application_subdomain}.${var.domain_name}"
-
-  type = "A"
+  name    = "${var.application_subdomain}.${var.domain_name}"
+  type    = "A"
 
   alias {
     name = var.cloudfront_enabled ? aws_cloudfront_distribution.app[0].domain_name : data.terraform_remote_state.application.outputs.alb_dns_name
