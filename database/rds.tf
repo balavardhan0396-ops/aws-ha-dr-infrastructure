@@ -1,4 +1,3 @@
-
 resource "aws_db_instance" "main" {
   identifier = "${var.project_name}-${var.environment}-mysql"
 
@@ -21,7 +20,7 @@ resource "aws_db_instance" "main" {
 
   db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [
-    data.terraform_remote_state.network.outputs.db_security_group_id
+    data.terraform_remote_state.network.outputs.db_security_group_id,
   ]
 
   multi_az = true
