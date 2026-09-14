@@ -1,7 +1,3 @@
-# ---------------------------------------------------------
-# Read Network Infrastructure from Remote State
-# ---------------------------------------------------------
-
 data "terraform_remote_state" "network" {
   backend = "s3"
 
@@ -12,18 +8,11 @@ data "terraform_remote_state" "network" {
   }
 }
 
-# ---------------------------------------------------------
-# RDS DB Subnet Group
-# ---------------------------------------------------------
-
-resource "aws_db_subnet_group" "main" {
-  name = "${var.project_name}-db-subnet-group"
-
+resource "aws_db_subnet_group" "app" {
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
   subnet_ids = data.terraform_remote_state.network.outputs.db_subnet_ids
 
-  description = "Private database subnets for RDS Multi-AZ"
-
   tags = {
-    Name = "${var.project_name}-db-subnet-group"
+    Name = "${var.project_name}-${var.environment}-db-subnet-group"
   }
 }
