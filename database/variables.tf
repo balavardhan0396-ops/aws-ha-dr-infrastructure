@@ -76,6 +76,15 @@ variable "deletion_protection" {
   default     = false
 }
 
+variable "database_subnet_ids" {
+  description = "Private subnet IDs used by the RDS database subnet group"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.database_subnet_ids) >= 2
+    error_message = "At least two subnet IDs are required for the DB subnet group."
+  }
+}
 variable "skip_final_snapshot" {
   description = "Whether to skip the final snapshot when destroying the database."
   type        = bool
