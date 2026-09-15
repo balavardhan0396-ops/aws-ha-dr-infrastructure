@@ -53,7 +53,7 @@ pipeline {
     environment {
 
         TERRAFORM_EXE = 'C:\\Terraform\\terraform.exe'
-        AWS_EXE        = 'C:\\Program Files\\Amazon\\AWSCLIV2\\aws.exe'
+        AWS_EXE        = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe'
 
         AWS_REGION = "${params.AWS_REGION}"
         AWS_DEFAULT_REGION = "${params.AWS_REGION}"
