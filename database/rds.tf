@@ -1,9 +1,18 @@
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  subnet_ids = var.database_subnet_ids
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Environment = var.environment
+  }
+}
+
 resource "aws_db_instance" "main" {
   identifier = "${var.project_name}-${var.environment}-mysql"
 
   engine         = "mysql"
   engine_version = var.db_engine_version
-
   instance_class = var.db_instance_class
 
   allocated_storage     = var.db_allocated_storage
@@ -18,19 +27,18 @@ resource "aws_db_instance" "main" {
 
   port = 3306
 
-  db_subnet_group_name   = aws_db_subnet_group.main.name
+  db_subnet_group_name = aws_db_subnet_group.main.name
+
   vpc_security_group_ids = [
-    data.terraform_remote_state.network.outputs.db_security_group_id,
+    data.terraform_remote_state.network.outputs.db_security_group_id
   ]
 
-  multi_az = true
-
+  multi_az          = true
   publicly_accessible = false
 
   backup_retention_period = var.backup_retention_period
   backup_window           = var.backup_window
-
-  maintenance_window = var.maintenance_window
+  maintenance_window     = var.maintenance_window
 
   auto_minor_version_upgrade = true
 
@@ -38,10 +46,14 @@ resource "aws_db_instance" "main" {
   skip_final_snapshot = var.skip_final_snapshot
 
   copy_tags_to_snapshot = true
-
-  apply_immediately = true
+  apply_immediately     = true
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-mysql"
+    Name        = "${var.project_name}-${var.environment}-mysql"
+    Environment = var.environment
   }
+
+  depends_on = [
+    aws_db_subnet_group.main
+  ]
 }
