@@ -53,12 +53,14 @@ pipeline {
     environment {
 
         TERRAFORM_EXE = 'C:\\Terraform\\terraform.exe'
-        AWS_EXE        = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe'
+
+        AWS_EXE = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe'
 
         AWS_REGION = "${params.AWS_REGION}"
         AWS_DEFAULT_REGION = "${params.AWS_REGION}"
 
-        AWS_CREDENTIALS_ID = 'aws-ha-dr-aws-credentials'
+        // Newly created Jenkins AWS credential ID
+        AWS_CREDENTIALS_ID = 'aws-login-crds'
 
         TF_IN_AUTOMATION = 'true'
         TF_INPUT = 'false'
@@ -66,6 +68,7 @@ pipeline {
         /*
          * Terraform module directories
          */
+
         TF_NETWORK_DIR     = 'network'
         TF_SECURITY_DIR    = 'security'
         TF_DATABASE_DIR    = 'database'
@@ -129,117 +132,34 @@ pipeline {
             }
         }
 
-        /*
-         * ==========================================================
-         * NETWORK MODULE
-         * ==========================================================
-         *
-         * Network is already completed.
-         *
-         * Keep this section commented for now.
-         * Remove the comments when Network needs to be deployed
-         * or updated in the future.
-         */
-
-        /*
-        stage('Validate Network Directory') {
+        stage('Test AWS Credentials') {
 
             steps {
 
-                bat '''
-                    @echo off
-
-                    if not exist "%TF_NETWORK_DIR%" (
-                        echo ERROR: Network directory was not found.
-                        exit /b 1
-                    )
-
-                    echo Network directory found:
-                    echo %TF_NETWORK_DIR%
-                '''
-            }
-        }
-
-        stage('Network Terraform Init and Validate') {
-
-            steps {
-
-                dir("${env.TF_NETWORK_DIR}") {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
 
                     bat '''
                         @echo off
 
-                        "%TERRAFORM_EXE%" init -input=false
+                        echo ==========================================
+                        echo Testing AWS Credentials
+                        echo ==========================================
+
+                        "%AWS_EXE%" sts get-caller-identity
 
                         if errorlevel 1 (
-                            echo ERROR: Network Terraform init failed.
+                            echo ERROR: AWS credentials validation failed.
                             exit /b 1
                         )
 
-                        "%TERRAFORM_EXE%" validate
-
-                        if errorlevel 1 (
-                            echo ERROR: Network Terraform validation failed.
-                            exit /b 1
-                        )
+                        echo AWS credentials are working successfully.
                     '''
                 }
             }
         }
-
-        stage('Network Terraform Plan') {
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_NETWORK_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" plan ^
-                                -input=false ^
-                                -out=tfplan
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Network Terraform Apply') {
-
-            when {
-                expression {
-                    return params.DEPLOY_INFRASTRUCTURE
-                }
-            }
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_NETWORK_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" apply ^
-                                -input=false ^
-                                -auto-approve ^
-                                tfplan
-                        '''
-                    }
-                }
-            }
-        }
-        */
 
         /*
          * ==========================================================
@@ -274,34 +194,42 @@ pipeline {
 
             steps {
 
-                dir("${env.TF_SECURITY_DIR}") {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
 
-                    bat '''
-                        @echo off
+                    dir("${env.TF_SECURITY_DIR}") {
 
-                        echo ==========================================
-                        echo Security Terraform Initialization
-                        echo ==========================================
+                        bat '''
+                            @echo off
 
-                        "%TERRAFORM_EXE%" init -input=false
+                            echo ==========================================
+                            echo Security Terraform Initialization
+                            echo ==========================================
 
-                        if errorlevel 1 (
-                            echo ERROR: Security Terraform init failed.
-                            exit /b 1
-                        )
+                            "%TERRAFORM_EXE%" init -input=false -reconfigure
 
-                        echo.
-                        echo ==========================================
-                        echo Security Terraform Validation
-                        echo ==========================================
+                            if errorlevel 1 (
+                                echo ERROR: Security Terraform init failed.
+                                exit /b 1
+                            )
 
-                        "%TERRAFORM_EXE%" validate
+                            echo.
+                            echo ==========================================
+                            echo Security Terraform Validation
+                            echo ==========================================
 
-                        if errorlevel 1 (
-                            echo ERROR: Security Terraform validation failed.
-                            exit /b 1
-                        )
-                    '''
+                            "%TERRAFORM_EXE%" validate
+
+                            if errorlevel 1 (
+                                echo ERROR: Security Terraform validation failed.
+                                exit /b 1
+                            )
+
+                            echo Security Terraform init and validation completed.
+                        '''
+                    }
                 }
             }
         }
@@ -332,6 +260,8 @@ pipeline {
                                 echo ERROR: Security Terraform plan failed.
                                 exit /b 1
                             )
+
+                            echo Security Terraform plan completed.
                         '''
                     }
                 }
@@ -341,6 +271,7 @@ pipeline {
         stage('Security Terraform Apply') {
 
             when {
+
                 expression {
                     return params.DEPLOY_INFRASTRUCTURE
                 }
@@ -371,6 +302,8 @@ pipeline {
                                 echo ERROR: Security Terraform apply failed.
                                 exit /b 1
                             )
+
+                            echo Security Terraform apply completed.
                         '''
                     }
                 }
@@ -379,50 +312,130 @@ pipeline {
 
         /*
          * ==========================================================
-         * DATABASE MODULE
+         * NETWORK MODULE - CURRENTLY DISABLED
          * ==========================================================
          *
-         * Database is already completed.
-         *
-         * Keep commented for now.
+         * Network is already completed.
+         * Uncomment this section only when required.
          */
 
         /*
-        stage('Validate Database Directory') {
+        stage('Network Terraform Init and Validate') {
 
             steps {
 
-                bat '''
-                    @echo off
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
 
-                    if not exist "%TF_DATABASE_DIR%" (
-                        echo ERROR: Database directory was not found.
-                        exit /b 1
-                    )
+                    dir("${env.TF_NETWORK_DIR}") {
 
-                    echo Database directory found:
-                    echo %TF_DATABASE_DIR%
-                '''
+                        bat '''
+                            @echo off
+
+                            "%TERRAFORM_EXE%" init -input=false -reconfigure
+
+                            if errorlevel 1 exit /b 1
+
+                            "%TERRAFORM_EXE%" validate
+
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
+                }
             }
         }
 
+        stage('Network Terraform Plan') {
+
+            steps {
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
+
+                    dir("${env.TF_NETWORK_DIR}") {
+
+                        bat '''
+                            @echo off
+
+                            "%TERRAFORM_EXE%" plan ^
+                                -input=false ^
+                                -out=tfplan
+
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Network Terraform Apply') {
+
+            when {
+
+                expression {
+                    return params.DEPLOY_INFRASTRUCTURE
+                }
+            }
+
+            steps {
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
+
+                    dir("${env.TF_NETWORK_DIR}") {
+
+                        bat '''
+                            @echo off
+
+                            "%TERRAFORM_EXE%" apply ^
+                                -input=false ^
+                                -auto-approve ^
+                                tfplan
+
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
+                }
+            }
+        }
+        */
+
+        /*
+         * ==========================================================
+         * DATABASE MODULE - CURRENTLY DISABLED
+         * ==========================================================
+         */
+
+        /*
         stage('Database Terraform Init and Validate') {
 
             steps {
 
-                dir("${env.TF_DATABASE_DIR}") {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
 
-                    bat '''
-                        @echo off
+                    dir("${env.TF_DATABASE_DIR}") {
 
-                        "%TERRAFORM_EXE%" init -input=false
+                        bat '''
+                            @echo off
 
-                        if errorlevel 1 exit /b 1
+                            "%TERRAFORM_EXE%" init -input=false -reconfigure
 
-                        "%TERRAFORM_EXE%" validate
+                            if errorlevel 1 exit /b 1
 
-                        if errorlevel 1 exit /b 1
-                    '''
+                            "%TERRAFORM_EXE%" validate
+
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
                 }
             }
         }
@@ -444,6 +457,8 @@ pipeline {
                             "%TERRAFORM_EXE%" plan ^
                                 -input=false ^
                                 -out=tfplan
+
+                            if errorlevel 1 exit /b 1
                         '''
                     }
                 }
@@ -453,6 +468,7 @@ pipeline {
         stage('Database Terraform Apply') {
 
             when {
+
                 expression {
                     return params.DEPLOY_INFRASTRUCTURE
                 }
@@ -474,6 +490,8 @@ pipeline {
                                 -input=false ^
                                 -auto-approve ^
                                 tfplan
+
+                            if errorlevel 1 exit /b 1
                         '''
                     }
                 }
@@ -485,9 +503,6 @@ pipeline {
          * ==========================================================
          * APPLICATION MODULE - FUTURE
          * ==========================================================
-         *
-         * Uncomment this complete block when Application deployment
-         * is required.
          */
 
         /*
@@ -495,19 +510,25 @@ pipeline {
 
             steps {
 
-                dir("${env.TF_APPLICATION_DIR}") {
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+                ]) {
 
-                    bat '''
-                        @echo off
+                    dir("${env.TF_APPLICATION_DIR}") {
 
-                        "%TERRAFORM_EXE%" init -input=false
+                        bat '''
+                            @echo off
 
-                        if errorlevel 1 exit /b 1
+                            "%TERRAFORM_EXE%" init -input=false -reconfigure
 
-                        "%TERRAFORM_EXE%" validate
+                            if errorlevel 1 exit /b 1
 
-                        if errorlevel 1 exit /b 1
-                    '''
+                            "%TERRAFORM_EXE%" validate
+
+                            if errorlevel 1 exit /b 1
+                        '''
+                    }
                 }
             }
         }
@@ -529,6 +550,8 @@ pipeline {
                             "%TERRAFORM_EXE%" plan ^
                                 -input=false ^
                                 -out=tfplan
+
+                            if errorlevel 1 exit /b 1
                         '''
                     }
                 }
@@ -538,6 +561,7 @@ pipeline {
         stage('Application Terraform Apply') {
 
             when {
+
                 expression {
                     return params.DEPLOY_INFRASTRUCTURE
                 }
@@ -559,199 +583,10 @@ pipeline {
                                 -input=false ^
                                 -auto-approve ^
                                 tfplan
+
+                            if errorlevel 1 exit /b 1
                         '''
                     }
-                }
-            }
-        }
-        */
-
-        /*
-         * ==========================================================
-         * DNS / HTTPS / CLOUDFRONT MODULE - FUTURE
-         * ==========================================================
-         */
-
-        /*
-        stage('DNS HTTPS Terraform Init and Validate') {
-
-            steps {
-
-                dir("${env.TF_DNS_DIR}") {
-
-                    bat '''
-                        @echo off
-
-                        "%TERRAFORM_EXE%" init -input=false
-
-                        if errorlevel 1 exit /b 1
-
-                        "%TERRAFORM_EXE%" validate
-
-                        if errorlevel 1 exit /b 1
-                    '''
-                }
-            }
-        }
-
-        stage('DNS HTTPS Terraform Plan') {
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_DNS_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" plan ^
-                                -input=false ^
-                                -out=tfplan
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('DNS HTTPS Terraform Apply') {
-
-            when {
-                expression {
-                    return params.DEPLOY_INFRASTRUCTURE
-                }
-            }
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_DNS_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" apply ^
-                                -input=false ^
-                                -auto-approve ^
-                                tfplan
-                        '''
-                    }
-                }
-            }
-        }
-        */
-
-        /*
-         * ==========================================================
-         * MONITORING MODULE - FUTURE
-         * ==========================================================
-         */
-
-        /*
-        stage('Monitoring Terraform Init and Validate') {
-
-            steps {
-
-                dir("${env.TF_MONITORING_DIR}") {
-
-                    bat '''
-                        @echo off
-
-                        "%TERRAFORM_EXE%" init -input=false
-
-                        if errorlevel 1 exit /b 1
-
-                        "%TERRAFORM_EXE%" validate
-
-                        if errorlevel 1 exit /b 1
-                    '''
-                }
-            }
-        }
-
-        stage('Monitoring Terraform Plan') {
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_MONITORING_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" plan ^
-                                -input=false ^
-                                -out=tfplan
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Monitoring Terraform Apply') {
-
-            when {
-                expression {
-                    return params.DEPLOY_INFRASTRUCTURE
-                }
-            }
-
-            steps {
-
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-
-                    dir("${env.TF_MONITORING_DIR}") {
-
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" apply ^
-                                -input=false ^
-                                -auto-approve ^
-                                tfplan
-                        '''
-                    }
-                }
-            }
-        }
-        */
-
-        /*
-         * ==========================================================
-         * SCRIPTS MODULE - FUTURE
-         * ==========================================================
-         */
-
-        /*
-        stage('Run Deployment and Validation Scripts') {
-
-            steps {
-
-                dir("${env.TF_SCRIPTS_DIR}") {
-
-                    bat '''
-                        @echo off
-
-                        echo Running deployment and validation scripts...
-
-                        rem Add script commands here later.
-                        rem Example:
-                        rem powershell -ExecutionPolicy Bypass -File deploy.ps1
-                    '''
                 }
             }
         }
