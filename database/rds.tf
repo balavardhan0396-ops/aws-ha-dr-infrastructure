@@ -1,4 +1,4 @@
-resource "aws_db_subnet_group" "main" {
+resource "aws_db_subnet_group" "app" {
   name       = "${var.project_name}-${var.environment}-db-subnet-group"
   subnet_ids = data.terraform_remote_state.network.outputs.db_subnet_ids
 
@@ -27,7 +27,7 @@ resource "aws_db_instance" "main" {
 
   port = 3306
 
-  db_subnet_group_name = aws_db_subnet_group.main.name
+  db_subnet_group_name = aws_db_subnet_group.app.name
 
   vpc_security_group_ids = [
     data.terraform_remote_state.network.outputs.db_security_group_id
