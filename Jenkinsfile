@@ -167,7 +167,7 @@ pipeline {
          * ==========================================================
          */
 
-        stage('Validate Security Directory') {
+/*        stage('Validate Security Directory') {
 
             steps {
 
@@ -308,7 +308,7 @@ pipeline {
                     }
                 }
             }
-        }
+        }   */
 
         /*
          * ==========================================================
@@ -501,11 +501,11 @@ pipeline {
 
         /*
          * ==========================================================
-         * APPLICATION MODULE - FUTURE
+         * APPLICATION MODULE 
          * ==========================================================
          */
 
-        /*
+        
         stage('Application Terraform Init and Validate') {
 
             steps {
@@ -590,7 +590,7 @@ pipeline {
                 }
             }
         }
-        */
+        
 
     }
 
