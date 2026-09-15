@@ -43,25 +43,25 @@ pipeline {
         string(
             name: 'AMI_ID',
             defaultValue: '',
-            description: 'Not required for Network-only deployment'
+            description: 'AMI ID for application deployment'
         )
 
         string(
             name: 'NOTIFICATION_EMAIL',
             defaultValue: '',
-            description: 'Not required for Network-only deployment'
+            description: 'Notification email'
         )
 
         string(
             name: 'DOMAIN_NAME',
             defaultValue: '',
-            description: 'Not required for Network-only deployment'
+            description: 'Domain name'
         )
 
         string(
             name: 'APP_REPOSITORY_URL',
             defaultValue: '',
-            description: 'Not required for Network-only deployment'
+            description: 'Application repository URL'
         )
 
         string(
@@ -79,14 +79,6 @@ pipeline {
 
     environment {
 
-        /*
-         * Windows executable paths.
-         *
-         * Preferred Terraform location:
-         * C:\Terraform\terraform.exe
-         *
-         * AWS CLI location shown below is your current installation.
-         */
         TERRAFORM_EXE = 'C:\\Terraform\\terraform.exe'
 
         AWS_EXE = 'C:\\Users\\DELL\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe'
@@ -107,17 +99,15 @@ pipeline {
 
         TF_INPUT = 'false'
 
-        /*
-         * Network-only deployment directory.
-         * Change this if your folder is named differently.
-         */
-        TF_NETWORK_DIR = 'network'
+        TF_DATABASE_DIR = 'database'
     }
 
     stages {
 
         stage('Checkout Infrastructure') {
+
             steps {
+
                 echo 'Checking out infrastructure repository...'
 
                 checkout scm
@@ -125,7 +115,9 @@ pipeline {
         }
 
         stage('Validate Inputs and Tools') {
+
             steps {
+
                 bat '''
                     @echo off
 
@@ -164,49 +156,40 @@ pipeline {
             }
         }
 
-        stage('Validate Required Directories') {
+        stage('Validate Database Directory') {
+
             steps {
+
                 bat '''
                     @echo off
 
                     echo ==========================================
-                    echo Checking Terraform directory
+                    echo Checking Database Terraform directory
                     echo ==========================================
 
-                    if not exist "%TF_NETWORK_DIR%" (
-                        echo ERROR: Terraform directory was not found:
-                        echo %TF_NETWORK_DIR%
+                    if not exist "%TF_DATABASE_DIR%" (
+                        echo ERROR: Database Terraform directory was not found:
+                        echo %TF_DATABASE_DIR%
                         exit /b 1
                     )
 
-                    echo Terraform directory found:
-                    echo %TF_NETWORK_DIR%
+                    echo Database Terraform directory found:
+                    echo %TF_DATABASE_DIR%
                 '''
             }
         }
 
-      /*  stage('Terraform Format Check') {
-            steps {
-                bat '''
-                    @echo off
+        stage('Terraform Database Validation') {
 
-                    echo ==========================================
-                    echo Terraform Format Check
-                    echo ==========================================
-
-                    "%TERRAFORM_EXE%" fmt -check -recursive
-                '''
-            }
-        }
-*/
-        stage('Terraform Network Validation') {
             steps {
-                dir("${TF_NETWORK_DIR}") {
+
+                dir("${env.TF_DATABASE_DIR}") {
+
                     bat '''
                         @echo off
 
                         echo ==========================================
-                        echo Terraform Network Initialization
+                        echo Terraform Database Initialization
                         echo ==========================================
 
                         "%TERRAFORM_EXE%" init ^
@@ -220,7 +203,7 @@ pipeline {
 
                         echo.
                         echo ==========================================
-                        echo Terraform Network Validation
+                        echo Terraform Database Validation
                         echo ==========================================
 
                         "%TERRAFORM_EXE%" validate
@@ -235,13 +218,16 @@ pipeline {
         }
 
         stage('AWS Authentication') {
+
             steps {
+
                 withCredentials([
                     [
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: env.AWS_CREDENTIALS_ID
                     ]
                 ]) {
+
                     bat '''
                         @echo off
 
@@ -261,244 +247,42 @@ pipeline {
             }
         }
 
-        stage('Network Terraform Plan') {
-            steps {
-                tfDeploy("${env.TF_NETWORK_DIR}", '')
-            }
-        }
-
-        stage('Network Terraform Apply') {
-            when {
-                expression {
-                    return params.DEPLOY_INFRASTRUCTURE
-                }
-            }
+        stage('Database Terraform Plan and Apply') {
 
             steps {
-                dir("${env.TF_NETWORK_DIR}") {
-                    withCredentials([
-                        [
-                            $class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: env.AWS_CREDENTIALS_ID
-                        ]
-                    ]) {
-                        bat '''
-                            @echo off
 
-                            echo ==========================================
-                            echo Terraform Network Apply
-                            echo ==========================================
-
-                            if not exist tfplan (
-                                echo ERROR: tfplan file was not found.
-                                exit /b 1
-                            )
-
-                            "%TERRAFORM_EXE%" apply ^
-                                -input=false ^
-                                -auto-approve ^
-                                tfplan
-
-                            if errorlevel 1 (
-                                echo ERROR: Terraform apply failed.
-                                exit /b 1
-                            )
-                        '''
-                    }
-                }
-            }
-        }
-
-        /*
-        ============================================================
-        TEMPORARILY DISABLED STAGES
-        Enable these after Network deployment is successful.
-        ============================================================
-
-        stage('Checkout Application') {
-            when {
-                expression {
-                    return params.APP_REPOSITORY_URL?.trim()
-                }
-            }
-
-            steps {
-                dir('app-source') {
-                    git branch: params.APP_REPOSITORY_BRANCH,
-                        credentialsId: 'app-repository-credentials',
-                        url: params.APP_REPOSITORY_URL
-                }
-            }
-        }
-
-        stage('Resolve AMI') {
-            steps {
-                script {
-                    if (params.AMI_ID?.trim()) {
-                        env.RESOLVED_AMI_ID = params.AMI_ID.trim()
-                    } else {
-                        withCredentials([
-                            [
-                                $class: 'AmazonWebServicesCredentialsBinding',
-                                credentialsId: env.AWS_CREDENTIALS_ID
-                            ]
-                        ]) {
-                            env.RESOLVED_AMI_ID = bat(
-                                script: '''
-                                    @echo off
-                                    "%AWS_EXE%" ssm get-parameter ^
-                                        --name /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 ^
-                                        --query Parameter.Value ^
-                                        --output text ^
-                                        --region "%AWS_REGION%"
-                                ''',
-                                returnStdout: true
-                            ).trim()
-                        }
-                    }
-                }
-            }
-        }
-
-        stage('Database') {
-            steps {
-                tfDeploy('database', '')
-            }
-        }
-
-        stage('Application Base') {
-            steps {
                 tfDeploy(
-                    'application',
-                    "-var=app_image=${env.IMAGE_URI} -var=ami_id=${env.RESOLVED_AMI_ID} -var=enable_asg=false"
+                    "${env.TF_DATABASE_DIR}",
+                    ''
                 )
             }
         }
-
-        stage('Build and Push Image') {
-            steps {
-                dir('app-source') {
-                    withCredentials([
-                        [
-                            $class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: env.AWS_CREDENTIALS_ID
-                        ]
-                    ]) {
-                        bat '''
-                            @echo off
-
-                            if not exist Dockerfile (
-                                echo ERROR: Dockerfile was not found.
-                                exit /b 1
-                            )
-
-                            "%AWS_EXE%" ecr describe-repositories ^
-                                --repository-names "%ECR_REPOSITORY%" ^
-                                --region "%AWS_REGION%"
-
-                            if errorlevel 1 (
-                                echo ECR repository was not found. Creating it...
-
-                                "%AWS_EXE%" ecr create-repository ^
-                                    --repository-name "%ECR_REPOSITORY%" ^
-                                    --region "%AWS_REGION%"
-
-                                if errorlevel 1 (
-                                    echo ERROR: ECR repository creation failed.
-                                    exit /b 1
-                                )
-                            )
-
-                            "%AWS_EXE%" ecr get-login-password ^
-                                --region "%AWS_REGION%" |
-                                docker login ^
-                                --username AWS ^
-                                --password-stdin "%ECR_REGISTRY%"
-
-                            if errorlevel 1 (
-                                echo ERROR: Docker login failed.
-                                exit /b 1
-                            )
-
-                            docker build ^
-                                -t "%IMAGE_URI%" ^
-                                "%APP_DOCKER_CONTEXT%"
-
-                            if errorlevel 1 (
-                                echo ERROR: Docker build failed.
-                                exit /b 1
-                            )
-
-                            docker push "%IMAGE_URI%"
-
-                            if errorlevel 1 (
-                                echo ERROR: Docker push failed.
-                                exit /b 1
-                            )
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Application ASG') {
-            steps {
-                tfDeploy(
-                    'application',
-                    "-var=app_image=${env.IMAGE_URI} -var=ami_id=${env.RESOLVED_AMI_ID} -var=enable_asg=true"
-                )
-            }
-        }
-
-        stage('Monitoring') {
-            steps {
-                tfDeploy(
-                    'monitoring',
-                    "-var=notification_email=${params.NOTIFICATION_EMAIL}"
-                )
-            }
-        }
-
-        stage('Security') {
-            steps {
-                tfDeploy('security', '')
-            }
-        }
-
-        stage('DNS and HTTPS') {
-            when {
-                expression {
-                    return params.DOMAIN_NAME?.trim()
-                }
-            }
-
-            steps {
-                tfDeploy(
-                    'dns-https',
-                    "-var=domain_name=${params.DOMAIN_NAME}"
-                )
-            }
-        }
-
-        */
     }
 
     post {
 
         success {
+
             echo '=========================================='
-            echo 'Jenkins pipeline completed successfully.'
+
+            echo 'Database Terraform pipeline completed successfully.'
+
             echo '=========================================='
         }
 
         failure {
+
             echo '=========================================='
-            echo 'Jenkins pipeline failed.'
+
+            echo 'Database Terraform pipeline failed.'
+
             echo 'Please review the console output.'
+
             echo '=========================================='
         }
 
         always {
+
             echo 'Cleaning Jenkins workspace...'
 
             deleteDir()
@@ -556,12 +340,18 @@ def tfDeploy(String module, String extraVars) {
             """
 
             if (params.DEPLOY_INFRASTRUCTURE) {
+
                 bat """
                     @echo off
 
                     echo ==========================================
                     echo Terraform Apply - ${module}
                     echo ==========================================
+
+                    if not exist tfplan (
+                        echo ERROR: tfplan file was not found.
+                        exit /b 1
+                    )
 
                     "%TERRAFORM_EXE%" apply ^
                         -input=false ^
