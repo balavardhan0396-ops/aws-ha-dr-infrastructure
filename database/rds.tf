@@ -1,6 +1,6 @@
 resource "aws_db_subnet_group" "main" {
   name       = "${var.project_name}-${var.environment}-db-subnet-group"
-  subnet_ids = var.database_subnet_ids
+  subnet_ids = data.terraform_remote_state.network.outputs.db_subnet_ids
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-db-subnet-group"
@@ -33,7 +33,7 @@ resource "aws_db_instance" "main" {
     data.terraform_remote_state.network.outputs.db_security_group_id
   ]
 
-  multi_az          = true
+  multi_az           = true
   publicly_accessible = false
 
   backup_retention_period = var.backup_retention_period
@@ -52,8 +52,4 @@ resource "aws_db_instance" "main" {
     Name        = "${var.project_name}-${var.environment}-mysql"
     Environment = var.environment
   }
-
-  depends_on = [
-    aws_db_subnet_group.main
-  ]
 }
