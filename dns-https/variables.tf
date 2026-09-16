@@ -16,17 +16,6 @@ variable "environment" {
   default     = "lab"
 }
 
-variable "domain_name" {
-  description = "Root domain name managed through Route 53"
-  type        = string
-}
-
-variable "application_subdomain" {
-  description = "Subdomain used to access the application"
-  type        = string
-  default     = "app"
-}
-
 variable "cloudfront_enabled" {
   description = "Whether CloudFront should be created"
   type        = bool
