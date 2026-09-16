@@ -539,46 +539,40 @@ pipeline {
         }
 
         stage('DNS-HTTPS Terraform Plan') {
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-                    dir("${env.TF_DNS_DIR}") {
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" plan -input=false -out=tfplan
-                            if errorlevel 1 exit /b 1
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('DNS-HTTPS Terraform Apply') {
-            when {
-                expression {
-                    return params.DEPLOY_INFRASTRUCTURE
-                }
-            }
-            steps {
-                withCredentials([
-                    [$class: 'AmazonWebServicesCredentialsBinding',
-                     credentialsId: "${env.AWS_CREDENTIALS_ID}"]
-                ]) {
-                    dir("${env.TF_DNS_DIR}") {
-                        bat '''
-                            @echo off
-
-                            "%TERRAFORM_EXE%" apply -input=false -auto-approve tfplan
-                            if errorlevel 1 exit /b 1
-                        '''
-                    }
-                }
+    steps {
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding',
+             credentialsId: "${AWS_CREDENTIALS_ID}"]
+        ]) {
+            dir('dns-https') {
+                bat """
+                    terraform plan ^
+                    -var="domain_name=${params.DOMAIN_NAME}" ^
+                    -out=tfplan
+                """
             }
         }
     }
+}
+        stage('DNS-HTTPS Terraform Apply') {
+    when {
+        expression {
+            return params.DEPLOY_INFRASTRUCTURE
+        }
+    }
+    steps {
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding',
+             credentialsId: "${AWS_CREDENTIALS_ID}"]
+        ]) {
+            dir('dns-https') {
+                bat """
+                    terraform apply -auto-approve tfplan
+                """
+            }
+        }
+    }
+}
 
     post {
 
