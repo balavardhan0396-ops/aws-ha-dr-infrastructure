@@ -801,7 +801,6 @@ pipeline {
 
                             "%TERRAFORM_EXE%" plan ^
                                 -input=false ^
-                                -var="domain_name=${params.DOMAIN_NAME}" ^
                                 -out=tfplan
 
                             if errorlevel 1 (
