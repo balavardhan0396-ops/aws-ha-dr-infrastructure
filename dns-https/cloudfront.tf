@@ -15,10 +15,6 @@ resource "aws_cloudfront_distribution" "app" {
 
   comment = "${var.project_name}-${var.environment} application distribution"
 
-  aliases = [
-    "${var.application_subdomain}.${var.domain_name}"
-  ]
-
   origin {
     domain_name = data.terraform_remote_state.application_cloudfront.outputs.alb_dns_name
 
@@ -38,7 +34,8 @@ resource "aws_cloudfront_distribution" "app" {
   default_cache_behavior {
     target_origin_id = "${var.project_name}-${var.environment}-alb"
 
-    viewer_protocol_policy = "redirect-to-https"
+    # Do not force HTTPS for this assignment
+    viewer_protocol_policy = "allow-all"
 
     allowed_methods = [
       "GET",
@@ -66,11 +63,10 @@ resource "aws_cloudfront_distribution" "app" {
     }
   }
 
+  # Use the default CloudFront certificate.
+  # No custom domain or ACM certificate is required.
   viewer_certificate {
-    acm_certificate_arn = aws_acm_certificate_validation.cloudfront.certificate_arn
-
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
+    cloudfront_default_certificate = true
   }
 
   is_ipv6_enabled = true
