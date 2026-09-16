@@ -506,7 +506,7 @@ pipeline {
          */
 
         
-        stage('Application Terraform Init and Validate') {
+    /*    stage('Application Terraform Init and Validate') {
 
             steps {
 
@@ -616,6 +616,132 @@ pipeline {
             echo 'Cleaning Jenkins workspace...'
 
             deleteDir()
+        }
+    }
+}
+*/
+        /*
+ * ==========================================================
+ * DNS-HTTPS MODULE
+ * ==========================================================
+ */
+
+stage('DNS-HTTPS Terraform Init and Validate') {
+
+    steps {
+
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding',
+             credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+        ]) {
+
+            dir("${env.TF_DNS_DIR}") {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo DNS-HTTPS Terraform Initialization
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" init -input=false -reconfigure
+
+                    if errorlevel 1 (
+                        echo ERROR: DNS-HTTPS Terraform init failed.
+                        exit /b 1
+                    )
+
+                    echo.
+                    echo ==========================================
+                    echo DNS-HTTPS Terraform Validation
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" validate
+
+                    if errorlevel 1 (
+                        echo ERROR: DNS-HTTPS Terraform validation failed.
+                        exit /b 1
+                    )
+
+                    echo DNS-HTTPS Terraform init and validation completed.
+                '''
+            }
+        }
+    }
+}
+
+stage('DNS-HTTPS Terraform Plan') {
+
+    steps {
+
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding',
+             credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+        ]) {
+
+            dir("${env.TF_DNS_DIR}") {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo DNS-HTTPS Terraform Plan
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" plan ^
+                        -input=false ^
+                        -out=tfplan
+
+                    if errorlevel 1 (
+                        echo ERROR: DNS-HTTPS Terraform plan failed.
+                        exit /b 1
+                    )
+
+                    echo DNS-HTTPS Terraform plan completed.
+                '''
+            }
+        }
+    }
+}
+
+stage('DNS-HTTPS Terraform Apply') {
+
+    when {
+
+        expression {
+            return params.DEPLOY_INFRASTRUCTURE
+        }
+    }
+
+    steps {
+
+        withCredentials([
+            [$class: 'AmazonWebServicesCredentialsBinding',
+             credentialsId: "${env.AWS_CREDENTIALS_ID}"]
+        ]) {
+
+            dir("${env.TF_DNS_DIR}") {
+
+                bat '''
+                    @echo off
+
+                    echo ==========================================
+                    echo DNS-HTTPS Terraform Apply
+                    echo ==========================================
+
+                    "%TERRAFORM_EXE%" apply ^
+                        -input=false ^
+                        -auto-approve ^
+                        tfplan
+
+                    if errorlevel 1 (
+                        echo ERROR: DNS-HTTPS Terraform apply failed.
+                        exit /b 1
+                    )
+
+                    echo DNS-HTTPS Terraform apply completed.
+                '''
+            }
         }
     }
 }
