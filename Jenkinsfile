@@ -736,7 +736,7 @@ pipeline {
          * ==========================================================
          */
 
-        /*
+        
         stage('DNS-HTTPS Terraform Init and Validate') {
 
             steps {
@@ -856,7 +856,6 @@ pipeline {
                 }
             }
         }
-        */
 
     }
 
