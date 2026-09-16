@@ -44,12 +44,6 @@ pipeline {
             description: 'Environment name'
         )
 
-        string(
-            name: 'DOMAIN_NAME',
-            defaultValue: 'example.com',
-            description: 'DNS domain name for DNS-HTTPS module'
-        )
-
         booleanParam(
             name: 'DEPLOY_INFRASTRUCTURE',
             defaultValue: false,
@@ -738,10 +732,11 @@ pipeline {
 
         /*
          * ==========================================================
-         * DNS-HTTPS MODULE - ACTIVE
+         * DNS-HTTPS MODULE - DISABLED
          * ==========================================================
          */
 
+        /*
         stage('DNS-HTTPS Terraform Init and Validate') {
 
             steps {
@@ -862,6 +857,8 @@ pipeline {
             }
         }
     }
+
+        */
 
     post {
 
